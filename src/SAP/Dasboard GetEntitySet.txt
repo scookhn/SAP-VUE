@@ -1,0 +1,279 @@
+  METHOD /iwbep/if_mgw_appl_srv_runtime~get_entityset.
+**TRY.
+*CALL METHOD SUPER->/IWBEP/IF_MGW_APPL_SRV_RUNTIME~GET_ENTITYSET
+**  EXPORTING
+**    iv_entity_name           =
+**    iv_entity_set_name       =
+**    iv_source_name           =
+**    it_filter_select_options =
+**    it_order                 =
+**    is_paging                =
+**    it_navigation_path       =
+**    it_key_tab               =
+**    iv_filter_string         =
+**    iv_search_string         =
+**    io_tech_request_context  =
+**  IMPORTING
+**    er_entityset             =
+**    es_response_context      =
+*    .
+** CATCH /iwbep/cx_mgw_busi_exception .
+** CATCH /iwbep/cx_mgw_tech_exception .
+**ENDTRY.
+
+    DATA: lt_filters TYPE /iwbep/t_mgw_select_option,
+          ls_filter  TYPE /iwbep/s_mgw_select_option.
+
+    DATA: lt_ws_mas TYPE TABLE OF zst_wms_ws_mas.
+
+    DATA: lt_cabnt TYPE TABLE OF cabnt.
+    DATA: lt_cabn  TYPE TABLE OF cabn.
+
+    DATA: lr_qdatu TYPE TABLE OF rsis_s_range,
+          ls_qdatu TYPE rsis_s_range.
+
+    DATA: lr_werks TYPE TABLE OF rsis_s_range,
+          ls_werks TYPE rsis_s_range.
+
+    DATA: lr_matnr TYPE TABLE OF rsis_s_range,
+          ls_matnr TYPE rsis_s_range.
+
+    DATA: lr_charg TYPE TABLE OF rsis_s_range,
+          ls_charg TYPE rsis_s_range.
+
+    DATA: lr_zccod TYPE TABLE OF rsis_s_range,
+          ls_zccod TYPE rsis_s_range.
+
+    DATA: lr_bwart TYPE TABLE OF rsis_s_range,
+          ls_bwart TYPE rsis_s_range.
+
+    DATA: lv_p_qdatu TYPE ltap_qdatu,
+          lv_p_werks TYPE werks_d,
+          lv_p_matnr TYPE matnr,
+          lv_p_charg TYPE charg_d,
+          lv_p_zccod TYPE qcode,
+          lv_p_lgnum TYPE lgnum,
+          lv_p_bwart TYPE bwart.
+
+    DATA: ls_select_options TYPE /iwbep/s_cod_select_option.
+    FIELD-SYMBOLS: <fs_ws_mas> TYPE zst_wms_ws_mas.
+
+    DATA vl_cuobj_bm TYPE cuobj_bm.
+    DATA: ti_ausp TYPE TABLE OF ausp,
+          wa_ausp LIKE LINE OF ti_ausp.
+
+    DATA lv_zclie TYPE c LENGTH 30.
+    DATA lv_cliente TYPE c LENGTH 30.
+    DATA lv_cliente_code TYPE qcode.
+    DATA lv_kurztext TYPE qtxt_code.
+    DATA lv_charg6 TYPE c LENGTH 6.
+    DATA lv_dia TYPE c LENGTH 2.
+    DATA lv_mes TYPE c LENGTH 2.
+    DATA lv_anio TYPE c LENGTH 4.
+    DATA lv_chargdatu TYPE c LENGTH 8.
+    DATA lv_qdatuhigh_dt TYPE dats.
+
+    CONSTANTS c_vltyp TYPE ltap_vltyp VALUE '901'.
+    CONSTANTS c_nltyp TYPE ltap_nltyp VALUE 'ESL'.
+    CONSTANTS c_nlpla TYPE ltap_nlpla VALUE 'ANULACION'.
+
+    "Extrae Filtros
+    lt_filters = io_tech_request_context->get_filter( )->get_filter_select_options( ).
+    READ TABLE lt_filters WITH TABLE KEY property = 'QDATU' INTO ls_filter.
+
+    IF sy-subrc EQ 0.
+      LOOP AT ls_filter-select_options INTO ls_select_options.
+        MOVE-CORRESPONDING ls_select_options TO ls_qdatu.
+        ls_qdatu-option = 'BT'.
+        MOVE ls_qdatu-low TO lv_qdatuhigh_dt.
+        lv_qdatuhigh_dt = lv_qdatuhigh_dt + 1.
+        MOVE lv_qdatuhigh_dt TO ls_qdatu-high.
+        APPEND ls_qdatu TO lr_qdatu.
+      ENDLOOP.
+    ENDIF.
+
+    lt_filters = io_tech_request_context->get_filter( )->get_filter_select_options( ).
+    READ TABLE lt_filters WITH TABLE KEY property = 'WERKS' INTO ls_filter.
+
+    IF sy-subrc = 0.
+      LOOP AT ls_filter-select_options INTO ls_select_options.
+        MOVE-CORRESPONDING ls_select_options TO ls_werks.
+        APPEND ls_werks TO lr_werks.
+      ENDLOOP.
+    ENDIF.
+
+    lt_filters = io_tech_request_context->get_filter( )->get_filter_select_options( ).
+    READ TABLE lt_filters WITH TABLE KEY property = 'MATNR' INTO ls_filter.
+
+    IF sy-subrc = 0.
+      LOOP AT ls_filter-select_options INTO ls_select_options.
+        MOVE-CORRESPONDING ls_select_options TO ls_matnr.
+        APPEND ls_matnr TO lr_matnr.
+      ENDLOOP.
+    ENDIF.
+
+    lt_filters = io_tech_request_context->get_filter( )->get_filter_select_options( ).
+    READ TABLE lt_filters WITH TABLE KEY property = 'CHARG' INTO ls_filter.
+
+    IF sy-subrc = 0.
+      LOOP AT ls_filter-select_options INTO ls_select_options.
+        MOVE-CORRESPONDING ls_select_options TO ls_charg.
+        APPEND ls_charg TO lr_charg.
+      ENDLOOP.
+    ENDIF.
+
+    lt_filters = io_tech_request_context->get_filter( )->get_filter_select_options( ).
+    READ TABLE lt_filters WITH TABLE KEY property = 'ZCCOD' INTO ls_filter.
+
+    IF sy-subrc = 0.
+      LOOP AT ls_filter-select_options INTO ls_select_options.
+        MOVE-CORRESPONDING ls_select_options TO ls_zccod.
+        APPEND ls_zccod TO lr_zccod.
+      ENDLOOP.
+    ENDIF.
+
+    lt_filters = io_tech_request_context->get_filter( )->get_filter_select_options( ).
+    READ TABLE lt_filters WITH TABLE KEY property = 'BWART' INTO ls_filter.
+
+    IF sy-subrc = 0.
+      LOOP AT ls_filter-select_options INTO ls_select_options.
+        MOVE-CORRESPONDING ls_select_options TO ls_bwart.
+        APPEND ls_bwart TO lr_bwart.
+      ENDLOOP.
+    ENDIF.
+
+
+    READ TABLE lr_qdatu INTO ls_qdatu INDEX 1.
+    lv_p_qdatu = ls_qdatu-low.
+
+    READ TABLE lr_matnr INTO ls_matnr INDEX 1.
+    lv_p_matnr = ls_matnr-low.
+
+    READ TABLE lr_werks INTO ls_werks INDEX 1.
+    lv_p_werks = ls_werks-low.
+
+    READ TABLE lr_charg INTO ls_charg INDEX 1.
+    lv_p_charg = ls_charg-low.
+
+    READ TABLE lr_zccod INTO ls_zccod INDEX 1.
+    lv_p_zccod = ls_zccod-low.
+
+    READ TABLE lr_bwart INTO ls_bwart INDEX 1.
+    lv_p_bwart = ls_bwart-low.
+
+    lv_dia = ls_qdatu-low+6(2).
+    lv_mes = ls_qdatu-low+4(2).
+    lv_anio = ls_qdatu-low+2(2).
+    CONCATENATE lv_dia lv_mes lv_anio INTO lv_chargdatu.
+
+
+    SELECT  b~lgnum  "Numero de almacen
+            b~tanum  "Numero de Orden de Transporte
+            b~tapos  "Posicion de Orden de Transporte
+            b~nlenr  "Número unidad almacén de destino
+            b~matnr  "Material
+            b~charg  "Numero de Lote LTAK
+            b~werks  "Centro
+            a~bwart  "Clase de Movimiento
+            b~qdatu  "Fecha de Masterizado (Fecha que ingreso a Inv.) viene de LTAK
+            b~qzeit  "Hora de Masterizado viene de LTAK
+            b~vsolm  "Cantidad teórica 'desde' en unidad de medida de almacén
+            b~vistm  "Cantidad real 'desde' en unidad-medida de almacén
+            b~vdifm  "Diferencia en la ubicación 'desde' en uni-med de almacén
+            b~vsola  "Cantidad teórica 'desde' en unidad-medida alternativa
+            b~vista  "Cantidad real de procedencia en unidad de medida alternativa
+            b~vdifa  "Diferencia en ubicación 'desde' en uni-med alternativa
+            b~brgew  "Peso viene de LTAP
+            b~gewei  "Unidad de Peso viene de LTAP
+     APPENDING CORRESPONDING FIELDS OF TABLE lt_ws_mas
+         FROM ltak AS a INNER JOIN ltap AS b
+           ON b~tanum = a~tanum
+       WHERE a~bwart IN lr_bwart
+         AND b~qdatu IN lr_qdatu
+         AND b~werks IN lr_werks
+         AND b~matnr IN lr_matnr
+         AND b~charg IN lr_charg
+         AND b~vltyp EQ c_vltyp
+         AND b~nltyp EQ c_nltyp
+         AND b~nlpla NE c_nlpla.
+
+
+    IF sy-subrc EQ 0.
+
+      SELECT * INTO TABLE lt_cabnt
+        FROM cabnt
+        WHERE spras = sy-langu.
+
+      SELECT * INTO TABLE lt_cabn
+        FROM  cabn.
+
+      LOOP AT lt_ws_mas ASSIGNING <fs_ws_mas>.
+        IF NOT <fs_ws_mas>-charg IS INITIAL.
+
+          lv_charg6 = <fs_ws_mas>-charg+4(6).
+          CONDENSE lv_charg6.
+          IF lv_charg6 EQ lv_chargdatu.
+
+            CLEAR vl_cuobj_bm.
+
+            SELECT SINGLE cuobj_bm
+              INTO vl_cuobj_bm
+              FROM mch1
+             WHERE matnr = <fs_ws_mas>-matnr
+               AND charg = <fs_ws_mas>-charg.
+
+            IF NOT vl_cuobj_bm IS INITIAL.
+              FREE ti_ausp.
+              REFRESH ti_ausp[].
+              SELECT * INTO TABLE ti_ausp
+                FROM ausp
+               WHERE objek = vl_cuobj_bm.
+
+              LOOP AT ti_ausp INTO wa_ausp.
+                IF wa_ausp-atinn EQ '0000000028'.
+                  lv_zclie = wa_ausp-atwrt.
+                  MOVE lv_zclie TO lv_cliente.
+                ENDIF.
+              ENDLOOP.
+            ENDIF.
+
+            IF NOT lv_cliente IS INITIAL.
+              CLEAR lv_cliente_code.
+              lv_cliente_code = lv_cliente+9(3).
+              CONDENSE lv_cliente_code.
+              SELECT SINGLE kurztext
+                INTO lv_kurztext FROM qpct
+                WHERE katalogart EQ '1'
+                  AND codegruppe EQ 'DESTINO'
+                  AND code = lv_cliente_code.
+
+              MOVE lv_cliente_code TO <fs_ws_mas>-zccod.
+              MOVE lv_kurztext TO <fs_ws_mas>-zclie.
+
+            ENDIF.
+          ELSE.
+            <fs_ws_mas>-flag = abap_true.
+          ENDIF.
+        ENDIF.
+
+      ENDLOOP.
+      UNASSIGN <fs_ws_mas>.
+
+      IF NOT lv_p_zccod IS INITIAL.
+        DELETE lt_ws_mas WHERE zccod NE lv_p_zccod.
+      ENDIF.
+      DELETE lt_ws_mas WHERE flag  EQ abap_true.
+
+
+      copy_data_to_ref(
+
+              EXPORTING
+
+                is_data = lt_ws_mas
+
+              CHANGING
+
+                cr_data = er_entityset ).
+    ENDIF.
+
+  ENDMETHOD.
